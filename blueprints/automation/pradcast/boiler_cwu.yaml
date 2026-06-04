@@ -1,0 +1,110 @@
+blueprint:
+  name: "Pradcast: grzanie CWU / boiler w najtańszym oknie"
+  description: >
+    Włącza grzałkę / boiler w najtańszym SPÓJNYM oknie N godzin tak, aby woda
+    była nagrzana do zadanej godziny. Okno liczone przez API pradcast.pl
+    (best-window, interruptible=false) z prognozy D+1..D+3.
+
+    Wymaga pakietu packages/pradcast.yaml (rest_command.pradcast_best_window).
+
+    Uwaga: automatyzacja po zaplanowaniu czeka (delay) do startu okna. Restart
+    Home Assistant w trakcie oczekiwania anuluje zaplanowane grzanie.
+  domain: automation
+  source_url: https://github.com/itlci/pradcast-homeassistant/blob/main/blueprints/automation/pradcast/boiler_cwu.yaml
+  input:
+    heater_switch:
+      name: Grzałka / przełącznik boilera
+      description: Encja switch lub input_boolean sterująca grzaniem.
+      selector:
+        entity:
+          domain:
+            - switch
+            - input_boolean
+    ready_by:
+      name: Gotowe do godziny
+      description: Woda ma być nagrzana na najbliższe wystąpienie tej godziny.
+      default: "06:30:00"
+      selector:
+        time: {}
+    heating_duration:
+      name: Czas grzania (godziny)
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 12
+          step: 1
+          unit_of_measurement: h
+          mode: slider
+    plan_at:
+      name: Pora zaplanowania
+      description: >
+        Kiedy policzyć okno. Wieczorem ceny RDN na jutro są już potwierdzone
+        przez TGE (publikacja ~10:45-13:00), więc plan opiera się na pewnych
+        cenach, nie na prognozie. Zalecany wieczór.
+      default: "22:00:00"
+      selector:
+        time: {}
+    min_confidence:
+      name: Minimalna pewność prognozy
+      description: Pomiń grzanie, gdy pewność niższa niż wybrana (high > medium > low).
+      default: medium
+      selector:
+        select:
+          options:
+            - high
+            - medium
+            - low
+
+mode: single
+max_exceeded: silent
+
+variables:
+  ready_by: !input ready_by
+  heating_duration: !input heating_duration
+  min_confidence: !input min_confidence
+  conf_rank:
+    high: 3
+    medium: 2
+    low: 1
+
+trigger:
+  - platform: time
+    at: !input plan_at
+
+action:
+  - variables:
+      by_str: >
+        {% set t = today_at(ready_by) %}
+        {% set by = t if t > now() else t + timedelta(days=1) %}
+        {{ by.strftime('%Y-%m-%dT%H:%M:%S') }}
+  - service: rest_command.pradcast_best_window
+    data:
+      duration: "{{ heating_duration }}"
+      by: "{{ by_str }}"
+      interruptible: "false"
+    response_variable: resp
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ resp.status != 200 or resp.content.start is not defined }}"
+        sequence:
+          - stop: "Pradcast: brak okna lub blad API"
+      - conditions:
+          - condition: template
+            value_template: "{{ conf_rank[resp.content.confidence] < conf_rank[min_confidence] }}"
+        sequence:
+          - stop: "Pradcast: pewnosc prognozy ponizej progu"
+  - variables:
+      wait_seconds: >
+        {{ [ (as_timestamp(resp.content.start) - as_timestamp(now())) | int, 0 ] | max }}
+  - delay:
+      seconds: "{{ wait_seconds }}"
+  - service: homeassistant.turn_on
+    target:
+      entity_id: !input heater_switch
+  - delay:
+      hours: !input heating_duration
+  - service: homeassistant.turn_off
+    target:
+      entity_id: !input heater_switch

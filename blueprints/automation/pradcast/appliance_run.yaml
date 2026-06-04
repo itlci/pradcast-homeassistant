@@ -1,0 +1,107 @@
+blueprint:
+  name: "Pradcast: powiadom o najtańszym starcie AGD (pralka / zmywarka)"
+  description: >
+    Wysyła powiadomienie z najtańszym SPÓJNYM oknem N godzin na uruchomienie
+    sprzętu (pralka, zmywarka) przed zadanym terminem. Dla sprzętu, który
+    uruchamiasz ręcznie - dostajesz info "uruchom o HH:MM". Opcjonalnie może
+    też załączyć gniazdko smart o godzinie startu.
+
+    Okno z API pradcast.pl (best-window, interruptible=false), prognoza D+1..D+3.
+    Wymaga pakietu packages/pradcast.yaml.
+  domain: automation
+  source_url: https://github.com/itlci/pradcast-homeassistant/blob/main/blueprints/automation/pradcast/appliance_run.yaml
+  input:
+    notify_service:
+      name: Usługa powiadomień
+      description: 'Np. notify.mobile_app_telefon. Domyślnie notify.notify.'
+      default: "notify.notify"
+      selector:
+        text: {}
+    appliance_name:
+      name: Nazwa sprzętu
+      default: "pralkę"
+      selector:
+        text: {}
+    cycle_duration:
+      name: Długość cyklu (godziny)
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 8
+          step: 1
+          unit_of_measurement: h
+          mode: slider
+    ready_by:
+      name: Gotowe do godziny
+      default: "07:00:00"
+      selector:
+        time: {}
+    plan_at:
+      name: Pora zaplanowania
+      default: "21:00:00"
+      selector:
+        time: {}
+    appliance_switch:
+      name: (Opcjonalnie) gniazdko smart do auto-startu
+      description: Zostaw puste, jeśli chcesz tylko powiadomienie.
+      default: {}
+      selector:
+        entity:
+          domain:
+            - switch
+            - input_boolean
+          multiple: false
+
+mode: single
+max_exceeded: silent
+
+variables:
+  cycle_duration: !input cycle_duration
+  ready_by: !input ready_by
+  notify_service: !input notify_service
+  appliance_name: !input appliance_name
+  appliance_switch: !input appliance_switch
+
+trigger:
+  - platform: time
+    at: !input plan_at
+
+action:
+  - variables:
+      by_str: >
+        {% set t = today_at(ready_by) %}
+        {% set by = t if t > now() else t + timedelta(days=1) %}
+        {{ by.strftime('%Y-%m-%dT%H:%M:%S') }}
+  - service: rest_command.pradcast_best_window
+    data:
+      duration: "{{ cycle_duration }}"
+      by: "{{ by_str }}"
+      interruptible: "false"
+    response_variable: resp
+  - condition: template
+    value_template: "{{ resp.status == 200 and resp.content.start is defined }}"
+  - variables:
+      start_dt: "{{ as_datetime(resp.content.start) }}"
+      start_hhmm: "{{ start_dt.strftime('%H:%M') }}"
+      start_day: "{{ start_dt.strftime('%d.%m') }}"
+      avg_kwh: "{{ resp.content.avg_price_kwh }}"
+      savings: "{{ resp.content.savings_vs_avg_pct }}"
+  - service: "{{ notify_service }}"
+    data:
+      title: "Pradcast: tani start"
+      message: >
+        Uruchom {{ appliance_name }} {{ start_day }} o {{ start_hhmm }}
+        (śr. {{ avg_kwh }} PLN/kWh, {{ savings }}% taniej niż średnia w oknie).
+  # Auto-start gniazdka smart o godzinie startu (tylko jeśli podane).
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ appliance_switch not in [none, '', []] }}"
+        sequence:
+          - delay:
+              seconds: >
+                {{ [ (as_timestamp(start_dt) - as_timestamp(now())) | int, 0 ] | max }}
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input appliance_switch

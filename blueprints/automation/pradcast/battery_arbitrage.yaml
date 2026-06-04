@@ -1,0 +1,108 @@
+blueprint:
+  name: "Pradcast: ładowanie banku energii w najtańszych godzinach"
+  description: >
+    Co godzinę przelicza N najtańszych godzin (interruptible=true) do zadanego
+    horyzontu i ładuje bank energii z sieci tylko w tych godzinach. Pozwala
+    wykorzystać wielodniowy dołek cen (prognoza D+1..D+3) - czego integracje z
+    samym D+1 nie potrafią.
+
+    UWAGA: blueprint steruje TYLKO ładowaniem z sieci. Rozładowanie / sprzedaż
+    nadwyżki jest poza zakresem v1 - opłacalność liczy się po cenie feed-in
+    (w PL: RCE/net-billing), a nie po RDN z tego API, i łatwo koliduje z
+    menedżerem energii falownika. Wymaga pakietu packages/pradcast.yaml.
+  domain: automation
+  source_url: https://github.com/itlci/pradcast-homeassistant/blob/main/blueprints/automation/pradcast/battery_arbitrage.yaml
+  input:
+    charge_switch:
+      name: Przełącznik ładowania banku
+      description: Encja switch wymuszająca ładowanie banku z sieci.
+      selector:
+        entity:
+          domain:
+            - switch
+            - input_boolean
+    charge_hours:
+      name: Liczba godzin ładowania na okno
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 24
+          step: 1
+          unit_of_measurement: h
+          mode: slider
+    horizon_hours:
+      name: Horyzont planowania (godziny od teraz)
+      description: Jak daleko w przód szukać najtańszych godzin (max ~72h = D+3).
+      default: 36
+      selector:
+        number:
+          min: 6
+          max: 72
+          step: 6
+          unit_of_measurement: h
+          mode: slider
+    soc_entity:
+      name: (Opcjonalnie) czujnik SoC banku
+      description: Encja % naładowania - ładowanie wstrzymane powyżej progu.
+      default: {}
+      selector:
+        entity:
+          domain:
+            - sensor
+    soc_max:
+      name: Próg SoC (%)
+      description: Nie ładuj powyżej tego poziomu (działa tylko z czujnikiem SoC).
+      default: 95
+      selector:
+        number:
+          min: 50
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+mode: single
+max_exceeded: silent
+
+variables:
+  charge_hours: !input charge_hours
+  horizon_hours: !input horizon_hours
+  soc_entity: !input soc_entity
+  soc_max: !input soc_max
+
+trigger:
+  - platform: time_pattern
+    minutes: "1"
+
+action:
+  - variables:
+      by_str: "{{ (now() + timedelta(hours=horizon_hours)).strftime('%Y-%m-%dT%H:%M:%S') }}"
+  - service: rest_command.pradcast_best_window
+    data:
+      duration: "{{ charge_hours }}"
+      by: "{{ by_str }}"
+      interruptible: "true"
+    response_variable: resp
+  - variables:
+      now_key: "{{ now().strftime('%Y-%m-%dT%H') }}"
+      on_keys: >
+        {{ (resp.content.hours if resp.status == 200 else [])
+           | map(attribute='datetime')
+           | map('regex_replace', ':.*$', '')
+           | list }}
+      soc_ok: >
+        {{ soc_entity in [none, '', []]
+           or (states(soc_entity) | float(0) < soc_max) }}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ now_key in on_keys and soc_ok }}"
+        sequence:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: !input charge_switch
+    default:
+      - service: homeassistant.turn_off
+        target:
+          entity_id: !input charge_switch

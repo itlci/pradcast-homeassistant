@@ -1,0 +1,127 @@
+# =============================================================================
+# Pradcast.pl - pakiet Home Assistant
+#
+# Czujniki cen prądu (RDN/TGE) + prognoza D+1..D+3 + komenda best-window do
+# planowania obciążeń. Wszystkie dane z publicznego API api.pradcast.pl.
+#
+# INSTALACJA:
+#   1. Dodaj w configuration.yaml:
+#        homeassistant:
+#          packages: !include_dir_named packages
+#   2. Skopiuj ten plik do katalogu  <config>/packages/pradcast.yaml
+#   3. Dodaj w secrets.yaml:
+#        pradcast_api_key: pcast_xxxxxxxx   # wygeneruj na pradcast.pl/dokumentacja-api
+#   4. Sprawdź konfigurację (Narzędzia deweloperskie -> Sprawdź konfigurację)
+#      i zrestartuj HA (czujniki rest: / rest_command: wymagają pełnego restartu).
+#
+# Encje utworzone przez ten pakiet:
+#   sensor.pradcast_raw_dzis                 (surowe dane dzisiejszej doby)
+#   sensor.pradcast_raw_jutro                (surowe dane D+1 + cheap_hours)
+#   sensor.pradcast_cena_teraz               (cena PLN/kWh w bieżącej godzinie)
+#   sensor.pradcast_srednia_dzis             (średnia dobowa dziś, PLN/kWh)
+#   sensor.pradcast_srednia_jutro            (średnia dobowa jutro, PLN/kWh)
+#   sensor.pradcast_nastepna_tania_godzina   (najbliższa tania godzina dziś)
+#   binary_sensor.pradcast_tanio_teraz       (czy bieżąca godzina jest tania)
+#   rest_command.pradcast_best_window        (planer okien - używany przez blueprinty)
+# =============================================================================
+
+rest:
+  # Dzisiejsza krzywa (actual RDN po ~10:45, wcześniej prognoza). Bieżąca cena i
+  # binary "tanio teraz" liczone są z atrybutu prices tego czujnika - bez
+  # dodatkowych zapytań co godzinę.
+  - resource: "https://api.pradcast.pl/prices/today"
+    scan_interval: 1800
+    headers:
+      X-API-Key: !secret pradcast_api_key
+    sensor:
+      - name: "Pradcast raw dzis"
+        unique_id: pradcast_raw_dzis
+        value_template: "{{ value_json.daily_avg_kwh }}"
+        unit_of_measurement: "PLN/kWh"
+        json_attributes:
+          - date
+          - source
+          - daily_avg
+          - daily_avg_kwh
+          - prices
+
+  # Jutro (D+1) - daily_avg, cheap_hours i pełna krzywa 24h.
+  - resource: "https://api.pradcast.pl/ha/sensor?count=5"
+    scan_interval: 1800
+    headers:
+      X-API-Key: !secret pradcast_api_key
+    sensor:
+      - name: "Pradcast raw jutro"
+        unique_id: pradcast_raw_jutro
+        value_template: "{{ value_json.daily_avg_kwh }}"
+        unit_of_measurement: "PLN/kWh"
+        json_attributes:
+          - date
+          - source
+          - daily_avg
+          - daily_avg_kwh
+          - cheap_hours
+          - prices
+
+template:
+  - sensor:
+      - name: "Pradcast cena teraz"
+        unique_id: pradcast_cena_teraz
+        unit_of_measurement: "PLN/kWh"
+        state: >
+          {% set prices = state_attr('sensor.pradcast_raw_dzis', 'prices') %}
+          {% set m = (prices or []) | selectattr('hour', 'equalto', now().hour) | list %}
+          {{ m[0].price_kwh if m else none }}
+        attributes:
+          poziom: >
+            {% set prices = state_attr('sensor.pradcast_raw_dzis', 'prices') %}
+            {% set m = (prices or []) | selectattr('hour', 'equalto', now().hour) | list %}
+            {{ m[0].level if m else 'unknown' }}
+          cena_mwh: >
+            {% set prices = state_attr('sensor.pradcast_raw_dzis', 'prices') %}
+            {% set m = (prices or []) | selectattr('hour', 'equalto', now().hour) | list %}
+            {{ m[0].price if m else none }}
+
+      - name: "Pradcast srednia dzis"
+        unique_id: pradcast_srednia_dzis
+        unit_of_measurement: "PLN/kWh"
+        state: "{{ state_attr('sensor.pradcast_raw_dzis', 'daily_avg_kwh') }}"
+
+      - name: "Pradcast srednia jutro"
+        unique_id: pradcast_srednia_jutro
+        unit_of_measurement: "PLN/kWh"
+        state: "{{ state_attr('sensor.pradcast_raw_jutro', 'daily_avg_kwh') }}"
+
+      - name: "Pradcast nastepna tania godzina"
+        unique_id: pradcast_nastepna_tania_godzina
+        state: >
+          {% set prices = state_attr('sensor.pradcast_raw_dzis', 'prices') %}
+          {% set h = now().hour %}
+          {% set upcoming = (prices or [])
+             | selectattr('hour', 'ge', h)
+             | selectattr('level', 'in', ['very_cheap', 'cheap'])
+             | list %}
+          {% if upcoming %}{{ '%02d:00' | format(upcoming[0].hour) }}{% else %}brak dzis{% endif %}
+
+  - binary_sensor:
+      - name: "Pradcast tanio teraz"
+        unique_id: pradcast_tanio_teraz
+        icon: >
+          {% set prices = state_attr('sensor.pradcast_raw_dzis', 'prices') %}
+          {% set m = (prices or []) | selectattr('hour', 'equalto', now().hour) | list %}
+          {{ 'mdi:flash' if (m and m[0].level in ['very_cheap', 'cheap']) else 'mdi:flash-off' }}
+        state: >
+          {% set prices = state_attr('sensor.pradcast_raw_dzis', 'prices') %}
+          {% set m = (prices or []) | selectattr('hour', 'equalto', now().hour) | list %}
+          {{ m[0].level in ['very_cheap', 'cheap'] if m else false }}
+
+rest_command:
+  # Planer najtańszego okna. Używany przez blueprinty. Zwraca JSON z polami
+  # start/end/avg_price_kwh/savings_vs_avg_pct/confidence/hours.
+  pradcast_best_window:
+    url: >-
+      https://api.pradcast.pl/ha/best-window?duration={{ duration }}&by={{ by | urlencode }}&interruptible={{ interruptible }}
+    method: GET
+    headers:
+      X-API-Key: !secret pradcast_api_key
+    timeout: 20

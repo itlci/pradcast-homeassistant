@@ -1,0 +1,48 @@
+# =============================================================================
+# Przykładowy dashboard Lovelace dla pradcast.pl
+#
+# Wykres 24h wymaga karty apexcharts-card (instalacja przez HACS -> Frontend).
+# Pozostałe karty są wbudowane. Wklej jako nową kartę w trybie YAML
+# (Ustawienia panelu -> Edytuj w YAML) lub do widoku.
+# =============================================================================
+
+title: Prąd
+views:
+  - title: Ceny prądu
+    cards:
+      # --- Skrót: cena teraz + czy tanio ---
+      - type: glance
+        title: Teraz
+        entities:
+          - entity: sensor.pradcast_cena_teraz
+            name: Cena teraz
+          - entity: binary_sensor.pradcast_tanio_teraz
+            name: Tanio?
+          - entity: sensor.pradcast_nastepna_tania_godzina
+            name: Następna tania
+
+      # --- Średnie dobowe ---
+      - type: glance
+        title: Średnia dobowa
+        entities:
+          - entity: sensor.pradcast_srednia_dzis
+            name: Dziś
+          - entity: sensor.pradcast_srednia_jutro
+            name: Jutro
+
+      # --- Wykres godzinowy 24h (dziś) - wymaga apexcharts-card ---
+      - type: custom:apexcharts-card
+        header:
+          show: true
+          title: Ceny godzinowe dziś (PLN/kWh)
+        graph_span: 24h
+        series:
+          - entity: sensor.pradcast_raw_dzis
+            name: Cena
+            type: column
+            data_generator: |
+              return (entity.attributes.prices || []).map(p => {
+                const d = new Date();
+                d.setHours(p.hour, 0, 0, 0);
+                return [d.getTime(), p.price_kwh];
+              });
