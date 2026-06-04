@@ -11,17 +11,17 @@ blueprint:
   domain: automation
   source_url: https://pradcast.pl/blueprints/automation/pradcast/appliance_run.yaml
   input:
-    notify_service:
-      name: Usługa powiadomień
+    notify_devices:
+      name: Urządzenia mobilne (powiadomienie)
       description: >
-        Nazwa usługi powiadomień Home Assistant, przez którą wysyłana jest
-        rekomendacja startu (np. notify.mobile_app_<urządzenie>). Listę
-        dostępnych usług można sprawdzić w Narzędzia deweloperskie -> Akcje.
-        Wartość domyślna notify.notify jest usługą generyczną i może nie
-        docierać na urządzenia mobilne.
-      default: "notify.notify"
+        Telefony/tablety z aplikacją Home Assistant Companion, na które zostanie
+        wysłana rekomendacja startu. Można wskazać kilka urządzeń - powiadomienie
+        trafi na każde z nich. Lista zawiera urządzenia z zainstalowaną
+        aplikacją mobilną HA.
       selector:
-        text: {}
+        device:
+          integration: mobile_app
+          multiple: true
     appliance_name:
       name: Nazwa sprzętu
       description: >
@@ -80,7 +80,7 @@ max_exceeded: silent
 variables:
   cycle_duration: !input cycle_duration
   ready_by: !input ready_by
-  notify_service: !input notify_service
+  notify_devices: !input notify_devices
   appliance_name: !input appliance_name
   appliance_switch: !input appliance_switch
 
@@ -108,12 +108,15 @@ action:
       start_day: "{{ start_dt.strftime('%d.%m') }}"
       avg_kwh: "{{ resp.content.avg_price_kwh }}"
       savings: "{{ resp.content.savings_vs_avg_pct }}"
-  - service: "{{ notify_service }}"
-    data:
-      title: "Pradcast: tani start"
-      message: >
-        Uruchom {{ appliance_name }} {{ start_day }} o {{ start_hhmm }}
-        (śr. {{ avg_kwh }} PLN/kWh, {{ savings }}% taniej niż średnia w oknie).
+  - repeat:
+      for_each: "{{ notify_devices }}"
+      sequence:
+        - service: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
+          data:
+            title: "Pradcast: tani start"
+            message: >
+              Uruchom {{ appliance_name }} {{ start_day }} o {{ start_hhmm }}
+              (śr. {{ avg_kwh }} PLN/kWh, {{ savings }}% taniej niż średnia w oknie).
   # Auto-start gniazdka smart o godzinie startu (tylko jeśli podane).
   - choose:
       - conditions:
