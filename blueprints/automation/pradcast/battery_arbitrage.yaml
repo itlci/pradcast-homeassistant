@@ -15,7 +15,9 @@ blueprint:
   input:
     charge_switch:
       name: Przełącznik ładowania banku
-      description: Encja switch wymuszająca ładowanie banku z sieci.
+      description: >
+        Encja przełącznika (switch) lub input_boolean wymuszająca ładowanie
+        banku energii z sieci.
       selector:
         entity:
           domain:
@@ -23,6 +25,9 @@ blueprint:
             - input_boolean
     charge_hours:
       name: Liczba godzin ładowania na okno
+      description: >
+        Liczba najtańszych godzin w obrębie horyzontu, w których bank ma być
+        ładowany.
       default: 3
       selector:
         number:
@@ -33,7 +38,9 @@ blueprint:
           mode: slider
     horizon_hours:
       name: Horyzont planowania (godziny od teraz)
-      description: Jak daleko w przód szukać najtańszych godzin (max ~72h = D+3).
+      description: >
+        Zakres czasu (w godzinach od teraz) przeszukiwany w poszukiwaniu
+        najtańszych godzin. Maksymalnie ~72 h (zasięg prognozy D+3).
       default: 36
       selector:
         number:
@@ -43,16 +50,20 @@ blueprint:
           unit_of_measurement: h
           mode: slider
     soc_entity:
-      name: (Opcjonalnie) czujnik SoC banku
-      description: Encja % naładowania - ładowanie wstrzymane powyżej progu.
+      name: Czujnik poziomu naładowania banku (opcjonalne)
+      description: >
+        Encja czujnika poziomu naładowania (%). Ładowanie jest wstrzymywane po
+        przekroczeniu ustawionego progu.
       default: {}
       selector:
         entity:
           domain:
             - sensor
     soc_max:
-      name: Próg SoC (%)
-      description: Nie ładuj powyżej tego poziomu (działa tylko z czujnikiem SoC).
+      name: Próg naładowania (%)
+      description: >
+        Górny próg naładowania. Powyżej tej wartości ładowanie nie jest
+        załączane. Działa wyłącznie z podanym czujnikiem poziomu naładowania.
       default: 95
       selector:
         number:

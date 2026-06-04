@@ -14,7 +14,9 @@ blueprint:
   input:
     heater_switch:
       name: Grzałka / przełącznik boilera
-      description: Encja switch lub input_boolean sterująca grzaniem.
+      description: >
+        Encja przełącznika (switch) lub input_boolean sterująca grzaniem
+        ciepłej wody użytkowej.
       selector:
         entity:
           domain:
@@ -22,12 +24,17 @@ blueprint:
             - input_boolean
     ready_by:
       name: Gotowe do godziny
-      description: Woda ma być nagrzana na najbliższe wystąpienie tej godziny.
+      description: >
+        Godzina, do której woda ma zostać nagrzana. Pod uwagę brane jest
+        najbliższe przyszłe wystąpienie tej pory.
       default: "06:30:00"
       selector:
         time: {}
     heating_duration:
       name: Czas grzania (godziny)
+      description: >
+        Łączny czas grzania w godzinach. Wyznacza długość poszukiwanego
+        spójnego okna o najniższej cenie.
       default: 2
       selector:
         number:
@@ -39,15 +46,17 @@ blueprint:
     plan_at:
       name: Pora zaplanowania
       description: >
-        Kiedy policzyć okno. Wieczorem ceny RDN na jutro są już potwierdzone
-        przez TGE (publikacja ~10:45-13:00), więc plan opiera się na pewnych
-        cenach, nie na prognozie. Zalecany wieczór.
+        Godzina dobowego uruchomienia obliczeń. Zalecana pora wieczorna - ceny
+        RDN na dobę następną są wówczas potwierdzone przez TGE (publikacja
+        zwykle 10:45-13:00), a plan korzysta z cen pewnych, nie z prognozy.
       default: "22:00:00"
       selector:
         time: {}
     min_confidence:
       name: Minimalna pewność prognozy
-      description: Pomiń grzanie, gdy pewność niższa niż wybrana (high > medium > low).
+      description: >
+        Minimalny akceptowany poziom pewności prognozy (high > medium > low).
+        Przy niższym poziomie grzanie zostaje pominięte.
       default: medium
       selector:
         select:

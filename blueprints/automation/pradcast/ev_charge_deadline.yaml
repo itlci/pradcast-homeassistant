@@ -14,7 +14,9 @@ blueprint:
   input:
     charger_switch:
       name: Przełącznik ładowarki
-      description: Encja switch sterująca ładowaniem (lub gniazdkiem ładowarki).
+      description: >
+        Encja przełącznika (switch) lub input_boolean sterująca ładowaniem
+        albo gniazdkiem ładowarki.
       selector:
         entity:
           domain:
@@ -22,11 +24,18 @@ blueprint:
             - input_boolean
     departure_time:
       name: Godzina wyjazdu
+      description: >
+        Termin gotowości pojazdu. Ładowanie planowane jest w najtańszych
+        godzinach do najbliższego przyszłego wystąpienia tej pory.
       default: "07:00:00"
       selector:
         time: {}
     charge_hours:
       name: Liczba godzin ładowania
+      description: >
+        Budżet czasu ładowania w godzinach. Automatyzacja co godzinę wybiera
+        tyle najtańszych godzin do wyjazdu. Zakłada, że ładowarka lub pojazd
+        zakończą ładowanie po osiągnięciu docelowego poziomu naładowania.
       default: 4
       selector:
         number:
@@ -36,10 +45,10 @@ blueprint:
           unit_of_measurement: h
           mode: slider
     enable_entity:
-      name: (Opcjonalnie) włącznik harmonogramu
+      name: Włącznik harmonogramu (opcjonalne)
       description: >
-        Encja (input_boolean), która musi być ON, żeby planować ładowanie.
-        Zostaw puste, by zawsze aktywne.
+        Encja input_boolean, która musi być włączona, aby harmonogram
+        ładowania działał. Pozostaw puste, aby był zawsze aktywny.
       default: {}
       selector:
         entity:

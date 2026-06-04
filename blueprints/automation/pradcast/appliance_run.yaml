@@ -13,17 +13,28 @@ blueprint:
   input:
     notify_service:
       name: Usługa powiadomień
-      description: 'Np. notify.mobile_app_telefon. Domyślnie notify.notify.'
+      description: >
+        Nazwa usługi powiadomień Home Assistant, przez którą wysyłana jest
+        rekomendacja startu (np. notify.mobile_app_<urządzenie>). Listę
+        dostępnych usług można sprawdzić w Narzędzia deweloperskie -> Akcje.
+        Wartość domyślna notify.notify jest usługą generyczną i może nie
+        docierać na urządzenia mobilne.
       default: "notify.notify"
       selector:
         text: {}
     appliance_name:
       name: Nazwa sprzętu
+      description: >
+        Nazwa urządzenia użyta w treści powiadomienia (np. „pralkę",
+        „zmywarkę").
       default: "pralkę"
       selector:
         text: {}
     cycle_duration:
       name: Długość cyklu (godziny)
+      description: >
+        Czas trwania cyklu urządzenia w godzinach. Wyznacza długość
+        poszukiwanego spójnego okna o najniższej cenie.
       default: 3
       selector:
         number:
@@ -34,17 +45,27 @@ blueprint:
           mode: slider
     ready_by:
       name: Gotowe do godziny
+      description: >
+        Godzina, do której cykl ma zostać zakończony. Pod uwagę brane jest
+        najbliższe przyszłe wystąpienie tej pory.
       default: "07:00:00"
       selector:
         time: {}
     plan_at:
       name: Pora zaplanowania
+      description: >
+        Godzina dobowego uruchomienia obliczeń i wysłania powiadomienia.
+        Zalecana pora wieczorna - ceny RDN na dobę następną są wówczas
+        potwierdzone przez TGE, a plan korzysta z cen pewnych, nie z prognozy.
       default: "21:00:00"
       selector:
         time: {}
     appliance_switch:
-      name: (Opcjonalnie) gniazdko smart do auto-startu
-      description: Zostaw puste, jeśli chcesz tylko powiadomienie.
+      name: Gniazdko smart do auto-startu (opcjonalne)
+      description: >
+        Encja przełącznika (np. gniazdko smart) załączana automatycznie o
+        wyznaczonej godzinie startu. Pozostaw puste, aby otrzymywać wyłącznie
+        powiadomienie.
       default: {}
       selector:
         entity:
