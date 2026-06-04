@@ -54,7 +54,7 @@ blueprint:
       description: >
         Encja czujnika poziomu naładowania (%). Ładowanie jest wstrzymywane po
         przekroczeniu ustawionego progu.
-      default: {}
+      default: []
       selector:
         entity:
           domain:

@@ -49,7 +49,7 @@ blueprint:
       description: >
         Encja input_boolean, która musi być włączona, aby harmonogram
         ładowania działał. Pozostaw puste, aby był zawsze aktywny.
-      default: {}
+      default: []
       selector:
         entity:
           domain:
