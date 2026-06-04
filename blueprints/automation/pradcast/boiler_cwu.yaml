@@ -10,7 +10,7 @@ blueprint:
     Uwaga: automatyzacja po zaplanowaniu czeka (delay) do startu okna. Restart
     Home Assistant w trakcie oczekiwania anuluje zaplanowane grzanie.
   domain: automation
-  source_url: https://github.com/itlci/pradcast-homeassistant/blob/main/blueprints/automation/pradcast/boiler_cwu.yaml
+  source_url: https://pradcast.pl/blueprints/automation/pradcast/boiler_cwu.yaml
   input:
     heater_switch:
       name: Grzałka / przełącznik boilera

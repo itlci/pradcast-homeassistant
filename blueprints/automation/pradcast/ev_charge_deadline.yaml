@@ -10,7 +10,7 @@ blueprint:
     energii - przy stabilnej prognozie auto ładuje się dokładnie w najtańszych
     godzinach. Wymaga pakietu packages/pradcast.yaml.
   domain: automation
-  source_url: https://github.com/itlci/pradcast-homeassistant/blob/main/blueprints/automation/pradcast/ev_charge_deadline.yaml
+  source_url: https://pradcast.pl/blueprints/automation/pradcast/ev_charge_deadline.yaml
   input:
     charger_switch:
       name: Przełącznik ładowarki

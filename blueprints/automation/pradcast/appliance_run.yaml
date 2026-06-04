@@ -9,7 +9,7 @@ blueprint:
     Okno z API pradcast.pl (best-window, interruptible=false), prognoza D+1..D+3.
     Wymaga pakietu packages/pradcast.yaml.
   domain: automation
-  source_url: https://github.com/itlci/pradcast-homeassistant/blob/main/blueprints/automation/pradcast/appliance_run.yaml
+  source_url: https://pradcast.pl/blueprints/automation/pradcast/appliance_run.yaml
   input:
     notify_service:
       name: Usługa powiadomień
