@@ -1,0 +1,2 @@
+# HA czyta YAML na Linuksie - wymuszamy LF w repo niezaleznie od OS edytora.
+* text=auto eol=lf
