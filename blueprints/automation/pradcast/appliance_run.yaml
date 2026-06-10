@@ -108,15 +108,18 @@ action:
       start_day: "{{ as_datetime(resp.content.start).strftime('%d.%m') }}"
       avg_kwh: "{{ resp.content.avg_price_kwh }}"
       savings: "{{ resp.content.savings_vs_avg_pct }}"
+  - variables:
+      # W rezimie cen <= 0 (poludniowy crash PV) "% taniej" myli - komunikat
+      # mowi wprost ze prad jest praktycznie za darmo. Inaczej standardowe %.
+      msg: >-
+        {% if (avg_kwh | float(0)) <= 0 %}Uruchom {{ appliance_name }} {{ start_day }} o {{ start_hhmm }} - ceny zerowe lub ujemne, prąd praktycznie za darmo.{% else %}Uruchom {{ appliance_name }} {{ start_day }} o {{ start_hhmm }} (śr. {{ avg_kwh }} PLN/kWh, {{ savings }}% taniej niż średnia w oknie).{% endif %}
   - repeat:
       for_each: "{{ notify_devices }}"
       sequence:
         - service: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
           data:
             title: "Pradcast: tani start"
-            message: >
-              Uruchom {{ appliance_name }} {{ start_day }} o {{ start_hhmm }}
-              (śr. {{ avg_kwh }} PLN/kWh, {{ savings }}% taniej niż średnia w oknie).
+            message: "{{ msg }}"
   # Auto-start gniazdka smart o godzinie startu (tylko jeśli podane).
   - choose:
       - conditions:
