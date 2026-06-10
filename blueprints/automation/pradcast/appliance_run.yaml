@@ -103,9 +103,9 @@ action:
   - condition: template
     value_template: "{{ resp.status == 200 and resp.content.start is defined }}"
   - variables:
-      start_dt: "{{ as_datetime(resp.content.start) }}"
-      start_hhmm: "{{ start_dt.strftime('%H:%M') }}"
-      start_day: "{{ start_dt.strftime('%d.%m') }}"
+      start_dt: "{{ resp.content.start }}"
+      start_hhmm: "{{ as_datetime(resp.content.start).strftime('%H:%M') }}"
+      start_day: "{{ as_datetime(resp.content.start).strftime('%d.%m') }}"
       avg_kwh: "{{ resp.content.avg_price_kwh }}"
       savings: "{{ resp.content.savings_vs_avg_pct }}"
   - repeat:
