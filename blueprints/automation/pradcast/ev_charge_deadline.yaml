@@ -77,20 +77,24 @@ action:
       by_str: >
         {% set t = today_at(departure_time) %}
         {% set by = t if t > now() else t + timedelta(days=1) %}
-        {{ by.strftime('%Y-%m-%dT%H:%M:%S') }}
+        {{ by.isoformat() }}
   - service: rest_command.pradcast_best_window
     data:
       duration: "{{ charge_hours }}"
       by: "{{ by_str }}"
       interruptible: "true"
     response_variable: resp
+  # Godziny porownywane jako numer godziny UTC (timestamp // 3600), nie tekst zegara:
+  # w nocy zmiany czasu (pazdziernik) godzina 02:00 wystepuje dwa razy - porownanie
+  # po zegarze wlaczaloby ladowanie w obu, choc API wybralo jedna.
   - variables:
-      now_key: "{{ now().strftime('%Y-%m-%dT%H') }}"
-      on_keys: >
-        {{ (resp.content.hours if resp.status == 200 else [])
-           | map(attribute='datetime')
-           | map('regex_replace', ':.*$', '')
-           | list }}
+      now_key: "{{ (as_timestamp(now()) // 3600) | int }}"
+      on_keys: >-
+        {%- set ns = namespace(k=[]) -%}
+        {%- for h in (resp.content.hours if resp.status == 200 else []) -%}
+        {%- set ns.k = ns.k + [(as_timestamp(h.datetime) // 3600) | int] -%}
+        {%- endfor -%}
+        {{ ns.k }}
   - choose:
       - conditions:
           - condition: template
